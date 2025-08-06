@@ -1,0 +1,13 @@
+pipeline{
+    agent any
+stages{
+
+   stage('hello')
+   {
+       steps{
+           echo 'hello this is testing code for jenkins'
+       }
+    }
+}
+    
+}

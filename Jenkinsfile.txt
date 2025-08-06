@@ -1,13 +1,66 @@
 pipeline{
-    agent any
-stages{
 
-   stage('hello')
-   {
+    agent any
+    //tells Jenkins to automatically install and use specific tool versions before running the pipeline.
+    tools{
+        jdk 'jdk17'
+        nodejs 'node16' 
+    }
+    environment {
+        SCANNER_HOME=tool 'sonar-scanner'
+    }
+stages{
+//   This ensures the build starts in a clean, fresh environment, with no leftover files from previous builds.
+   stage('Clean workspace') {
        steps{
-           echo 'hello this is testing code for jenkins'
+           cleanWs()
        }
     }
-}
     
+//This stage clones project source code from a GitHub repository into the Jenkins workspace.
+    stage('Checkout frome Git'){
+        steps{
+            git branch: 'master', url: 'https://github.com/tkmkushwah/Netflix-DevSecOps-CICD.git'
+        }
+    }
+    
+// This stage performs static code analysis using SonarQube.
+// It authenticates using a secure token stored in Jenkins credentials,
+// and runs the scanner using the path provided by Jenkins tool configuration.
+// If the project key is new, SonarQube will automatically create the project.
+// (Yeh stage code quality check ke liye SonarQube scan karta hai)
+    stage('SonarQube Scan') {
+            steps {
+                withSonarQubeEnv('sonar-server') {
+                    withCredentials([string(credentialsId: 'Sonar-token', variable: 'SONAR_TOKEN')]) {
+                        sh """
+                            echo Scanner Path: ${SCANNER_HOME}
+                            ls -l ${SCANNER_HOME}/bin
+                            ${SCANNER_HOME}/bin/sonar-scanner \
+                            -Dsonar.projectKey=Netflix-app \
+                            -Dsonar.projectName=Netflix-app \
+                            -Dsonar.sources=. \
+                            -Dsonar.login=$SONAR_TOKEN
+                        """
+                    }
+                }
+            }
+        }
+//Its job is to check the SonarQube analysis result — whether it passed or failed the quality gate. 
+    stage('Quality Gate'){
+      steps{
+        script{
+            waitForQualityGate abortPipeline: true, credentialId: 'Sonar-token'
+        }
+       }
+    }
+    
+    stage('Install Dependencies'){
+        steps{
+            script{
+             sh "npm install"   
+            }
+        }
+    }
+}
 }
